@@ -12,7 +12,6 @@
                                                                      ░        
 
 --]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -34,6 +33,7 @@ local ESPTable = {}
 local SavedPosition = nil
 local BackButton = nil
 local IsAntiDeadActive = false
+
 local UIColors = {
     background = Color3.fromRGB(25, 25, 30),
     header = Color3.fromRGB(0, 0, 0),
@@ -59,6 +59,7 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = MenuVisible
 MainFrame.ClipsDescendants = true
+
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 50)
 Title.BackgroundColor3 = UIColors.header
@@ -67,6 +68,8 @@ Title.Font = Enum.Font.GothamBold
 Title.Text = "Fucking Lip"
 Title.TextSize = 18
 Title.TextXAlignment = Enum.TextXAlignment.Center
+
+-- btn
 local ScrollFrame = Instance.new("ScrollingFrame", MainFrame)
 ScrollFrame.Size = UDim2.new(1, -10, 1, -60)
 ScrollFrame.Position = UDim2.new(0, 5, 0, 55)
@@ -75,6 +78,7 @@ ScrollFrame.BorderSizePixel = 0
 ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 680) 
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollingEnabled = true
+
 local ListLayout = Instance.new("UIListLayout", ScrollFrame)
 ListLayout.Padding = UDim.new(0, 10)
 ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -92,6 +96,7 @@ TPFrame.Active = true
 TPFrame.Draggable = true
 TPFrame.Visible = false
 TPFrame.ClipsDescendants = true
+
 local TPTitle = Instance.new("TextLabel", TPFrame)
 TPTitle.Size = UDim2.new(1, 0, 0, 40)
 TPTitle.BackgroundColor3 = UIColors.header
@@ -100,6 +105,7 @@ TPTitle.Font = Enum.Font.GothamBold
 TPTitle.Text = "CHỌN NGƯỜI ĐỂ TELEPORT"
 TPTitle.TextSize = 14
 TPTitle.TextXAlignment = Enum.TextXAlignment.Center
+
 local TPScroll = Instance.new("ScrollingFrame", TPFrame)
 TPScroll.Size = UDim2.new(1, -10, 1, -50)
 TPScroll.Position = UDim2.new(0, 5, 0, 45)
@@ -123,6 +129,7 @@ local function CreateButton(text, order)
     Button.TextSize = 16
     Button.AutoButtonColor = false
     Button.BorderSizePixel = 0
+    
     Button.MouseEnter:Connect(function()
         Button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.35)
     end)
@@ -233,30 +240,50 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- esp
+local function ShouldShowESP(plr)
+    if plr == LocalPlayer or not plr.Team then return false end
+    local teamName = plr.Team.Name
+    local currentMode = TargetTeams[CurrentTeamIndex]
+    
+    if currentMode == "AUTO" then
+        return (teamName ~= "" and teamName ~= (LocalPlayer.Team and LocalPlayer.Team.Name))
+    elseif currentMode == "POLICE" then
+        return (teamName == "Police")
+    elseif currentMode == "CRIMINALS" then
+        return (teamName == "Criminals")
+    end
+    return false
+end
+
 local function CreateESP(plr)
     if ESPTable[plr] then return end
     local pChar = plr.Character
-    if pChar and pChar:FindFirstChild("Humanoid") and pChar:FindFirstChild("Head") then
+    local head = pChar and pChar:FindFirstChild("Head")
+    if pChar and pChar:FindFirstChild("Humanoid") and head then
+        local teamColor = GetTeamColor((plr.Team and plr.Team.Name) or "")
+        
         local highlight = Instance.new("Highlight")
         highlight.Name = "ESPHighlight"
         highlight.Adornee = pChar
         highlight.FillTransparency = 0.5
         highlight.OutlineTransparency = 0
-        highlight.FillColor = GetTeamColor((plr.Team and plr.Team.Name) or "")
+        highlight.FillColor = teamColor
         highlight.OutlineColor = Color3.new(1, 1, 1)
         highlight.Parent = pChar
+        
         local gui = Instance.new("BillboardGui")
         gui.Name = "ESPName"
-        gui.Adornee = pChar.Head
+        gui.Adornee = head
         gui.Size = UDim2.new(0, 120, 0, 40)
         gui.AlwaysOnTop = true
         gui.StudsOffset = Vector3.new(0, 2.5, 0)
-        gui.Parent = pChar.Head
+        gui.Parent = head
+        
         local label = Instance.new("TextLabel", gui)
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
         label.Text = plr.Name
-        label.TextColor3 = GetTeamColor((plr.Team and plr.Team.Name) or "")
+        label.TextColor3 = teamColor
         label.Font = Enum.Font.GothamBold
         label.TextSize = 16
         label.TextStrokeTransparency = 0.5
@@ -266,80 +293,58 @@ local function CreateESP(plr)
 end
 
 local function UpdateESP()
-    for plr, assets in pairs(ESPTable) do
-        if not plr.Character or not plr.Character:FindFirstChild("Head") then
-            if assets.container then assets.container:Destroy() end
-            if assets.highlight then assets.highlight:Destroy() end
-            ESPTable[plr] = nil
-        end
-    end
-    
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Team then
-            local teamName = plr.Team.Name
-            local shouldShow = false
-            local currentMode = TargetTeams[CurrentTeamIndex]
-            
-            if currentMode == "AUTO" then
-                shouldShow = (teamName ~= "" and teamName ~= LocalPlayer.Team.Name)
-            elseif currentMode == "POLICE" then
-                shouldShow = (teamName == "Police")
-            elseif currentMode == "CRIMINALS" then
-                shouldShow = (teamName == "Criminals")
+        if plr ~= LocalPlayer then
+            local pChar = plr.Character
+            local hum = pChar and pChar:FindFirstChild("Humanoid")
+            local root = pChar and pChar:FindFirstChild("HumanoidRootPart")
+            local assets = ESPTable[plr]
+            if not pChar or not root or not hum then
+                if assets then
+                    if assets.container then assets.container:Destroy() end
+                    if assets.highlight then assets.highlight:Destroy() end
+                    ESPTable[plr] = nil
+                end
+                continue
             end
 
-            if ESPEnabled and shouldShow then
-                CreateESP(plr)
-            else
-                if ESPTable[plr] then
-                    if ESPTable[plr].container then ESPTable[plr].container.Enabled = false end
-                    if ESPTable[plr].highlight then ESPTable[plr].highlight.Enabled = false end
+            local showTarget = ESPEnabled and ShouldShowESP(plr) and (hum.Health > 0)
+            if showTarget and myRoot then
+                local distance = (myRoot.Position - root.Position).Magnitude
+                if distance > 500 then
+                    showTarget = false
                 end
             end
-        end
-    end
-    for plr, assets in pairs(ESPTable) do
-        local pChar = plr.Character
-        if pChar and pChar:FindFirstChild("Humanoid") then
-            local hum = pChar.Humanoid
-            local isAlive = (hum.Health > 0) and ESPEnabled
-            
-            if assets.container then assets.container.Enabled = isAlive end
-            if assets.nameLabel then assets.nameLabel.Visible = isAlive end
-            if assets.highlight then assets.highlight.Enabled = isAlive end
-            local teamColor = GetTeamColor((plr.Team and plr.Team.Name) or "")
-            if assets.nameLabel then assets.nameLabel.TextColor3 = teamColor end
-            if assets.highlight then assets.highlight.FillColor = teamColor end
+
+            if showTarget then
+                if not assets then
+                    CreateESP(plr)
+                    assets = ESPTable[plr]
+                end
+                if assets then
+                    local teamColor = GetTeamColor((plr.Team and plr.Team.Name) or "")
+                    assets.container.Enabled = true
+                    assets.highlight.Enabled = true
+                    assets.nameLabel.TextColor3 = teamColor
+                    assets.highlight.FillColor = teamColor
+                end
+            elseif assets then
+                assets.container.Enabled = false
+                assets.highlight.Enabled = false
+            end
         end
     end
 end
-
-Players.PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Connect(function() 
-        if ESPEnabled then 
-            task.wait(0.5)
-            CreateESP(plr) 
-        end 
-    end)
+task.spawn(function()
+    while task.wait(0.25) do
+        UpdateESP()
+    end
 end)
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    plr.CharacterAdded:Connect(function() 
-        if ESPEnabled then 
-            task.wait(0.5)
-            CreateESP(plr) 
-        end 
-    end)
-end
-
-
-local function RemoveBackButton()
-    if BackButton then
-        BackButton:Destroy()
-        BackButton = nil
-    end
-end
-
+-- b
 local function CreateBackButton()
     if BackButton then return end
     BackButton = Instance.new("TextButton", ScreenGui)
@@ -388,12 +393,8 @@ local function CheckAntiDead(currentHealth, humanoid, rootPart, char)
         local forwardVector = rootPart.CFrame.LookVector
         local escapeDistance = 411 
         local targetPos = rootPart.Position - (forwardVector * escapeDistance) + Vector3.new(0, 10, 0) 
-        
         rayParams.FilterDescendantsInstances = {char}
-        local groundRayParams = RaycastParams.new()
-        groundRayParams.FilterType = Enum.RaycastFilterType.Exclude
-        groundRayParams.FilterDescendantsInstances = {char}
-        local groundCheck = workspace:Raycast(targetPos + Vector3.new(0, 50, 0), Vector3.new(0, -100, 0), groundRayParams)
+        local groundCheck = workspace:Raycast(targetPos + Vector3.new(0, 50, 0), Vector3.new(0, -100, 0), rayParams)
         
         local finalCFrame
         if groundCheck then
@@ -402,30 +403,13 @@ local function CheckAntiDead(currentHealth, humanoid, rootPart, char)
             finalCFrame = CFrame.new(rootPart.Position - (forwardVector * 50) + Vector3.new(0, 5, 0))
         end
 
-        rootPart.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        rootPart.AssemblyLinearVelocity = Vector3.zero
         rootPart.CFrame = finalCFrame
         
         if CreateBackButton then CreateBackButton() end
     end
 end
 
-local function OnCharacterAdded(newChar)
-    if healthConnection then healthConnection:Disconnect() end
-    
-    IsAntiDeadActive = false 
-    
-    local humanoid = newChar:WaitForChild("Humanoid", 10) 
-    local rootPart = newChar:WaitForChild("HumanoidRootPart", 10)
-    
-    if humanoid and rootPart then
-        healthConnection = humanoid.HealthChanged:Connect(function(currentHealth)
-            CheckAntiDead(currentHealth, humanoid, rootPart, newChar)
-        end)
-    end
-end
-
-LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
-if LocalPlayer.Character then OnCharacterAdded(LocalPlayer.Character) end
 
 
 
